@@ -56,9 +56,11 @@ class TwoLayerNet(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         self.params['W1'] = np.random.randn(input_dim, hidden_dim) * weight_scale
-        self.params['b1'] = np.zeros(hidden_dim)
+        self.params['W1'] = self.params['W1'].astype(np.float32)
+        self.params['b1'] = np.zeros(hidden_dim).astype(np.float32)
         self.params['W2'] = np.random.randn(hidden_dim, num_classes) * weight_scale
-        self.params['b2'] = np.zeros(num_classes)
+        self.params['W2'] = self.params['W2'].astype(np.float32)
+        self.params['b2'] = np.zeros(num_classes).astype(np.float32)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -201,26 +203,14 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         
-        # self.params['W1'] = np.random.randn(input_dim, hidden_dims[0]) * weight_scale
-        # self.params['b1'] = np.zeros(hidden_dims[0])
-        # self.params['gamma1'] = np.ones(hidden_dims[0])
-        # self.params['beta1'] = np.zeros(hidden_dims[0])
-        # for i in range(self.num_layers-1):
-        #   self.params['W'+ str(i+2)] = np.random.randn(hidden_dims[i], hidden_dims[i+1]) * weight_scale
-        #   self.params['b'+ str(i+2)] = np.zeros(hidden_dims[i+1])
-        #   self.params['gamma' + str(i+2)] = np.ones(hidden_dims[i+1])
-        #   self.params['beta' + str(i+2)] = np.zeros(hidden_dims[i+1])
-        layer_dims = [input_dim] + hidden_dims + [num_classes]  # 所有层的维度
+        layer_dims = [input_dim] + hidden_dims + [num_classes]
         for i in range(self.num_layers):
-            # 权重矩阵：从当前层到下一层
             self.params[f'W{i+1}'] = np.random.randn(layer_dims[i], layer_dims[i+1]) * weight_scale
-            self.params[f'W{i+1}'] = self.params[f'W{i+1}'].astype(dtype)
-            # 偏置：与下一层维度相同
-            self.params[f'b{i+1}'] = np.zeros(layer_dims[i+1]).astype(dtype)
-            # 批归一化/层归一化参数，仅在隐藏层且 normalization 不为 None 时初始化
+            self.params[f'b{i+1}'] = np.zeros(layer_dims[i+1])
             if i < self.num_layers - 1 and self.normalization in ['batchnorm', 'layernorm']:
-                self.params[f'gamma{i+1}'] = np.ones(layer_dims[i+1]).astype(dtype)
-                self.params[f'beta{i+1}'] = np.zeros(layer_dims[i+1]).astype(dtype)
+                self.params[f'gamma{i+1}'] = np.ones(layer_dims[i+1])
+                self.params[f'beta{i+1}'] = np.zeros(layer_dims[i+1])
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -290,39 +280,30 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        caches = []  # 存储每层的缓存
+        caches = []
         out = X
-        for i in range(self.num_layers - 1):  # 处理隐藏层
-            # 仿射变换
+        for i in range(self.num_layers - 1):
             out, cache_affine = affine_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'])
-            
-            # 批归一化或层归一化
             if self.normalization == "batchnorm":
-                out, cache_bn = batchnorm_forward(out, self.params[f'gamma{i+1}'], 
-                                                self.params[f'beta{i+1}'], self.bn_params[i])
+                out, cache_bn = batchnorm_forward(out, self.params[f'gamma{i+1}'], self.params[f'beta{i+1}'], self.bn_params[i])
                 caches.append((cache_affine, cache_bn, 'batchnorm'))
             elif self.normalization == "layernorm":
-                out, cache_ln = layernorm_forward(out, self.params[f'gamma{i+1}'], 
-                                                self.params[f'beta{i+1}'], self.bn_params[i])
+                out, cache_ln = layernorm_forward(out, self.params[f'gamma{i+1}'], self.params[f'beta{i+1}'], self.bn_params[i])
                 caches.append((cache_affine, cache_ln, 'layernorm'))
             else:
                 caches.append((cache_affine, None, None))
-            
-            # ReLU 激活
+
             out, cache_relu = relu_forward(out)
             caches[-1] = caches[-1] + (cache_relu,)
-            
-            # Dropout
+
             if self.use_dropout:
                 out, cache_dropout = dropout_forward(out, self.dropout_param)
                 caches[-1] = caches[-1] + (cache_dropout,)
             else:
                 caches[-1] = caches[-1] + (None,)
 
-        # 最后一层：仿射变换到输出层
-        scores, cache_affine = affine_forward(out, self.params[f'W{self.num_layers}'], 
-                                            self.params[f'b{self.num_layers}'])
-        caches.append((cache_affine, None, None, None))
+        scores, cache_affine = affine_forward(out, self.params[f'W{self.num_layers}'], self.params[f'b{self.num_layers}'])
+        final_affine_cache = cache_affine
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -350,7 +331,7 @@ class FullyConnectedNet(object):
         for i in range(self.num_layers):
             loss += 0.5 * self.reg * np.sum(self.params[f'W{i+1}'] ** 2)
 
-        dout, grads[f'W{self.num_layers}'], grads[f'b{self.num_layers}'] = affine_backward(dout, caches[-1][0])
+        dout, grads[f'W{self.num_layers}'], grads[f'b{self.num_layers}'] = affine_backward(dout, final_affine_cache)
         grads[f'W{self.num_layers}'] += self.reg * self.params[f'W{self.num_layers}']
         for i in range(self.num_layers - 1, 0, -1):
             cache_affine, cache_bn, norm_type, cache_relu, cache_dropout = caches[i-1]

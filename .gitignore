@@ -1,1 +1,37 @@
+# IDE/编辑器配置
+.idea/
+.vscode/
+*.iml
+*.suo
+*.user
+
+# 操作系统文件
+**/.DS_Store
 __MACOSX/
+Thumbs.db
+
+# 构建/编译输出
+build/
+dist/
+temp/
+tmp/
+*.log
+*.exe
+*.o
+*.so
+*.dll
+
+# 敏感信息
+*.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Jupyter Notebook 检查点
+.ipynb_checkpoints/
