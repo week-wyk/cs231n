@@ -43,7 +43,7 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     ##############################################################################
     # TODO: Implement a single forward step for the vanilla RNN.                 #
     ##############################################################################
-    # 
+    next_h = torch.tanh(prev_h @ Wh+ x @ Wx + b)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -73,7 +73,14 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    # 
+    N, T, D = x.shape
+    H = h0.shape[1]
+    h = torch.zeros(N, T, H,dtype=x.dtype)
+    prev_h = h0
+    for t in range(T):
+        next_h = rnn_step_forward(x[:, t, :], prev_h, Wx, Wh, b)
+        h[:, t,:] = next_h
+        prev_h = next_h
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -101,7 +108,7 @@ def word_embedding_forward(x, W):
     #                                                                            #
     # HINT: This can be done in one line using Pytorch's array indexing.         #
     ##############################################################################
-    # 
+    out = W[x]
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -224,7 +231,7 @@ def temporal_softmax_loss(x, y, mask, verbose=False):
     N, T, V = x.shape
 
     x_flat = x.reshape(N * T, V)
-    y_flat = y.reshape(N * T)
+    y_flat = y.reshape(N * T).long()
     mask_flat = mask.reshape(N * T)
 
     loss = torch.nn.functional.cross_entropy(x_flat, y_flat, reduction='none')
