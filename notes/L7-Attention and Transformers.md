@@ -115,11 +115,13 @@ ViT 的天才之处在于它如何**把一张图像“翻译”成一个序列**
 
 ![image-20251116234704754](/ch7-PreNormTransformer.png)
 
-
+主要问题是一开始的结构为残差连接后过一遍ln，导致加入的输入也被迫过了一遍归一化，无法保证训练后输出效果比输入好，所以将ln前移，保证残差连接。
 
 #### 2 
 
 Replace Layer Normalization  with Root-Mean-Square  Normalization (RMSNorm)
+
+这是经验结果。
 
 #### 3 SwiGLU MLP
 
