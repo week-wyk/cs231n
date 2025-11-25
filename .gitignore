@@ -38,3 +38,5 @@ env/
 
 # data 忽略
 **/datasets/
+**/data/
+**/pretrained_model/
