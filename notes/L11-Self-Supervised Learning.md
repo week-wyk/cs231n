@@ -123,3 +123,4 @@ MoCo 让你用 **32 的 Batch Size**，享受 **65536 个负样本**的红利。
 
 ### DINO: Self-Distillation with No Labels
 
+DINO v2用了更大数据训练
