@@ -180,7 +180,10 @@ class Unet(nn.Module):
             # Make sure to exactly follow this structure of ModuleList in order to
             # load a pretrained checkpoint.
             ##################################################################
-
+            Resnet_Block1 = ResnetBlock(dim_in, dim_in, context_dim)
+            Resnet_Block2 = ResnetBlock(dim_in, dim_in, context_dim)
+            downblock = Downsample(dim_in, dim_out)
+            down_block = nn.ModuleList([Resnet_Block1, Resnet_Block2, downblock])
             ##################################################################
             self.downs.append(down_block)
 
@@ -204,7 +207,10 @@ class Unet(nn.Module):
             # Don't forget to account for the skip connections by having 2 x dim_out
             # channels at the input of both ResnetBlocks.
             ##################################################################
-
+            upblock = Upsample(dim_in, dim_out)
+            Resnet_Block1 = ResnetBlock(2*dim_out, dim_out, context_dim)
+            Resnet_Block2 = ResnetBlock(2*dim_out, dim_out, context_dim)
+            up_block = nn.ModuleList([upblock, Resnet_Block1, Resnet_Block2])
             self.ups.append(up_block)
             ##################################################################
 
@@ -226,7 +232,10 @@ class Unet(nn.Module):
         # You will have to call self.forward two times.
         # For unconditional sampling, pass None in`text_emb`.
         ##################################################################
-
+        x_con = self.forward(x, time, model_kwargs)
+        model_kwargs["text_emb"] = None
+        x_uncon = self.forward(x, time, model_kwargs)
+        x = (1 + cfg_scale) * x_con - cfg_scale * x_uncon
         ##################################################################
 
         return x
@@ -281,7 +290,23 @@ class Unet(nn.Module):
         #      skip connection from the downsampling path.
         #    - Make sure to pass the context to each ResNet block.
         ##################################################################
-
+        downs = []
+        for block in self.downs:
+            x = block[0](x, context)
+            downs.append(x)
+            x = block[1](x, context)
+            downs.append(x)
+            x = block[2](x)
+        x = self.mid_block1(x, context)
+        x = self.mid_block2(x, context)
+        for block in self.ups:
+            x = block[0](x)
+            ups = downs.pop()
+            add = torch.cat((x, ups), dim=1)
+            x = block[1](add, context)
+            ups = downs.pop()
+            add = torch.cat((x, ups), dim=1)
+            x = block[2](add, context)
         ##################################################################
 
         # Final block

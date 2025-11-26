@@ -102,7 +102,8 @@ class GaussianDiffusion(nn.Module):
         # Transform x_t and noise to get x_start according to Eq.(4) and Eq.(14).
         # Look at the coeffs in `__init__` method and use the `extract` function.
         ####################################################################
-
+        alpha_bar_t = extract(self.alphas_cumprod, t, x_t.shape)
+        x_start = (x_t - torch.sqrt(1 - alpha_bar_t) * noise) / torch.sqrt(alpha_bar_t)
         ####################################################################
         return x_start
 
@@ -121,7 +122,8 @@ class GaussianDiffusion(nn.Module):
         # Transform x_t and noise to get x_start according to Eq.(4) and Eq.(14).
         # Look at the coeffs in `__init__` method and use the `extract` function.
         ####################################################################
-
+        alpha_bar_t = extract(self.alphas_cumprod, t, x_t.shape)
+        pred_noise = (x_t - torch.sqrt(alpha_bar_t) * x_start) / torch.sqrt(1 - alpha_bar_t)
         ####################################################################
         return pred_noise
 
@@ -172,7 +174,17 @@ class GaussianDiffusion(nn.Module):
         #   4. Get the mean and std for q(x_{t-1} | x_t, x_0) using self.q_posterior,
         #      and sample x_{t-1}.
         ##################################################################
-        
+        prediction = self.model(x_t, t, model_kwargs)
+        if self.objective == "pred_noise":
+            noise = prediction
+            x_start = self.predict_start_from_noise(x_t, t, noise)
+        elif self.objective == "pred_x_start":
+            x_start = prediction
+            noise = self.predict_noise_from_start(x_t, t, x_start)
+        x_start = x_start.clamp(-1, 1)
+        mean, std = self.q_posterior(x_start, x_t, t)
+        noise_new = torch.randn_like(x_t)
+        x_tm1 = mean + std * noise_new
         ##################################################################
 
         return x_tm1
@@ -217,7 +229,8 @@ class GaussianDiffusion(nn.Module):
         # can be done as: x_t = mu + sigma * noise where noise is sampled from N(0, 1).
         # Approximately 3 lines of code.
         ####################################################################
-
+        alpha_bar_t = extract(self.alphas_cumprod, t, x_start.shape)
+        x_t = torch.sqrt(alpha_bar_t) * x_start + torch.sqrt(1 - alpha_bar_t) * noise
         ####################################################################
         return x_t
 
@@ -238,7 +251,10 @@ class GaussianDiffusion(nn.Module):
         # Finally, compute the weighted MSE loss.
         # Approximately 3-4 lines of code.
         ####################################################################
-
+        x_t = self.q_sample(x_start, t, noise)
+        prediction = self.model(x_t, t, model_kwargs)
+        loss = (prediction - target).square() 
+        loss = (loss * loss_weight).mean()
         ####################################################################
 
         return loss
