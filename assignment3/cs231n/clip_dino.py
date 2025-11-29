@@ -26,7 +26,9 @@ def get_similarity_no_loop(text_features, image_features):
     ############################################################################
     # TODO: Compute the cosine similarity. Do NOT use for loops.               #
     ############################################################################
-
+    norm_tf = torch.nn.functional.normalize(text_features, dim=1)
+    norm_if = torch.nn.functional.normalize(image_features, dim=1)
+    similarity = torch.mm(norm_tf, norm_if.t())
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -62,7 +64,17 @@ def clip_zero_shot_classifier(clip_model, clip_preprocess, images,
     ############################################################################
     # TODO: Find the class labels for images.                                  #
     ############################################################################
-
+    img_stack = []
+    for image in images:
+        img_stack.append(clip_preprocess(Image.fromarray(image)))
+    image_input = torch.stack(img_stack).to(device)
+    image_feature = clip_model.encode_image(image_input)
+    text_tokens = clip.tokenize(class_texts).to(device)
+    text_feature = clip_model.encode_text(text_tokens)
+    similarity = get_similarity_no_loop(text_feature, image_feature)
+    max_label = similarity.argmax(dim=0).view(1,-1)
+    for label in max_label[0]:
+        pred_classes.append(class_texts[label])
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -90,7 +102,15 @@ class CLIPImageRetriever:
         # computation for each text query. You may end up NOT using the above      #
         # similarity function for most compute-optimal implementation.#
         ############################################################################
-
+        self.clip_model = clip_model
+        self.clip_preprocess = clip_preprocess
+        self.images = images
+        img_stack = []
+        for image in images:
+            img_stack.append(clip_preprocess(Image.fromarray(image)))
+        image_input = torch.stack(img_stack).to(device)
+        self.image_feature = torch.nn.functional.normalize(clip_model.encode_image(image_input))
+        self.device = device
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -113,7 +133,12 @@ class CLIPImageRetriever:
         ############################################################################
         # TODO: Retrieve the indices of top-k images.                              #
         ############################################################################
-
+        text_tokens = clip.tokenize(query).to(self.device)
+        text_feature = self.clip_model.encode_text(text_tokens)
+        text_feature_norm = torch.nn.functional.normalize(text_feature)
+        similarity = text_feature_norm @ self.image_feature.t()
+        _, index = torch.Tensor.topk(similarity, k, dim=1)
+        top_indices = index[0].tolist()
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -230,7 +255,12 @@ class DINOSegmentation:
         # function to train classify each DINO feature vector into a seg. class.   #
         # It can be a linear layer or two layer neural network.                    #
         ############################################################################
-
+        self.device = device
+        self.num_classes = num_classes
+        self.inp_dim = inp_dim
+        self.DSmodel = torch.nn.Linear(self.inp_dim, self.num_classes, device= self.device).to(device)
+        self.optimizer = torch.optim.Adam(self.DSmodel.parameters(), lr=1e-3, eps= 1e-8, weight_decay=0.05)
+        self.loss = torch.nn.CrossEntropyLoss()
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -247,7 +277,14 @@ class DINOSegmentation:
         ############################################################################
         # TODO: Train your model for `num_iters` steps.                            #
         ############################################################################
-
+        self.DSmodel.train()
+        for i in range(num_iters):
+            self.optimizer.zero_grad()
+            forward = self.DSmodel(X_train)
+            loss = self.loss(forward, Y_train)
+            loss.backward()
+            self.optimizer.step()
+            if i % 50 == 0: print(f"iter{i}-loss:{loss.item()}")
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -267,7 +304,9 @@ class DINOSegmentation:
         ############################################################################
         # TODO: Train your model for `num_iters` steps.                            #
         ############################################################################
-
+        self.DSmodel.eval()
+        pred_forw = self.DSmodel(X_test)
+        pred_classes = torch.argmax(pred_forw, dim=1)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

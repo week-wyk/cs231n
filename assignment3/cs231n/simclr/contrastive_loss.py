@@ -96,6 +96,8 @@ def sim_positive_pairs(out_left, out_right):
     # pos_pairs = torch.zeros(N,1)
     # for i in range(N):
     #     pos_pairs[i] = sim(out_left[i], out_right[i])
+    out_left = torch.nn.functional.normalize(out_left, dim=1)
+    out_right = torch.nn.functional.normalize(out_right, dim=1) #同理之前这里也没有归一化
     pos_pairs = torch.sum(out_left * out_right, dim=1).view(-1, 1)
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -123,6 +125,7 @@ def compute_sim_matrix(out):
     # for i in range(twoN):
     #     for j in range(twoN):
     #         sim_matrix[i][j] = sim(out[i], out[j])
+    out = torch.nn.functional.normalize(out, dim=1) # 发现有问题，torch.mm是单纯的矩阵乘法，没有单位化
     sim_matrix = torch.mm(out, out.t())
     ##############################################################################
     #                               END OF YOUR CODE                             #
